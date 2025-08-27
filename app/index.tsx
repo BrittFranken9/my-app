@@ -1,13 +1,17 @@
-import { View, StyleSheet, Alert, SafeAreaView,TouchableOpacity, Image, Platform, ScrollView } from 'react-native';
-import { Link } from 'expo-router';
+import { View, StyleSheet, Alert, SafeAreaView, TouchableOpacity, Image, Platform, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
-import React from 'react';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { API_URL } from '@/constants/Api';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { Link } from 'expo-router';
+
+// 👇 Pak je API-url uit .env of zet fallback
+// const BASE_URL =
+//   process.env.EXPO_PUBLIC_API_URL ??
+//   'https://my-express-app-nawn.onrender.com';
 
 
 export default function LoginScreen() {
@@ -17,7 +21,7 @@ export default function LoginScreen() {
         const checkLogin = async () => {
             const userId = await AsyncStorage.getItem('userId');
             if (userId) {
-                router.replace('./(tabs)');
+                router.replace('/(tabs)/(home)');
             }
         };
         checkLogin();
@@ -38,7 +42,7 @@ export default function LoginScreen() {
             if (user) {
                 await AsyncStorage.setItem('userId', user);
 
-                router.replace('./(tabs)');
+                router.replace('/(tabs)/(home)');
             }
         } else {
             Alert.alert('Authentication canceled of failed');
@@ -66,14 +70,6 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#fff' },
-  container: {
-    padding: 16,
-    alignItems: 'flex-start',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-  },
+  container: { padding: 16, alignItems: 'flex-start' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
 });
