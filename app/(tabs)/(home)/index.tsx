@@ -1,4 +1,3 @@
-// app/(tabs)/(home)/index.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
@@ -14,6 +13,8 @@ import {
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '@/lib/api';
+import EventActions from '@/components/EventActions';
+import { fetchLikedIds, fetchGoingIds } from '@/lib/relations';
 
 type EventItem = {
   _id: string;
@@ -25,22 +26,21 @@ type EventItem = {
   imageUrl?: string;
   likeCount?: number;
   goingCount?: number;
+  // derived flags populated after we call the archive endpoints:
+  __liked?: boolean;
+  __going?: boolean;
 };
 
 function pickArray(data: any): any[] {
-  // Accept most common back-end result shapes
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.events)) return data.events;
   if (Array.isArray(data?.items)) return data.items;
   if (Array.isArray(data?.results)) return data.results;
-
-  // Nested { data: { items | results | docs } }
   const nested = data?.data;
   if (Array.isArray(nested?.items)) return nested.items;
   if (Array.isArray(nested?.results)) return nested.results;
   if (Array.isArray(nested?.docs)) return nested.docs;
-
   return [];
 }
 
@@ -55,8 +55,17 @@ function normalize(list: any[]): EventItem[] {
       date: it.date ?? it.startDate ?? it.startsAt ?? it.createdAt,
       startDate: it.startDate,
       imageUrl: it.imageUrl ?? it.cover ?? it.banner ?? undefined,
-      likeCount: it.likeCount ?? it.likes ?? 0,
-      goingCount: it.goingCount ?? it.going ?? it.attending ?? 0,
+      likeCount:
+        it.likeCount ??
+        it.likes ??
+        (Array.isArray(it.likedBy) ? it.likedBy.length : undefined) ??
+        0,
+      goingCount:
+        it.goingCount ??
+        it.going ??
+        it.attending ??
+        (Array.isArray(it.goingBy) ? it.goingBy.length : undefined) ??
+        0,
     };
   }).filter(e => !!e._id);
 }
@@ -88,31 +97,37 @@ export default function HomeScreen() {
       setLoading(true);
       setError(null);
 
-      // 1) Try /events
+      // 1) Load events
       const data1 = await api.get<any>('/events', undefined, 25000, 1);
       let list = normalize(pickArray(data1));
-
-      // 2) If still empty, try a common alt path: /events/list
       if (!list.length) {
         const data2 = await api.get<any>('/events/list', undefined, 25000, 1);
         list = normalize(pickArray(data2));
       }
 
+      // 2) If we know the user, pull liked + going sets from archive endpoints
+      if (userId) {
+        const [likedSet, goingSet] = await Promise.all([
+          fetchLikedIds(userId),
+          fetchGoingIds(userId),
+        ]);
+        list = list.map(e => ({
+          ...e,
+          __liked: likedSet.has(e._id),
+          __going: goingSet.has(e._id),
+        }));
+      }
+
       setItems(list);
     } catch (err: any) {
-      const reason =
-        err?.name === 'AbortError'
-          ? 'De verbinding duurde te lang (timeout).'
-          : String(err?.message || 'Onbekende fout');
+      const reason = err?.name === 'AbortError' ? 'De verbinding duurde te lang (timeout).' : String(err?.message || 'Onbekende fout');
       setError(`${reason}`);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   if (loading) {
     return (
@@ -120,7 +135,6 @@ export default function HomeScreen() {
         <View style={styles.center}>
           <ActivityIndicator />
           <Text style={styles.muted}>Even geduld…</Text>
-          <Text style={[styles.muted, { marginTop: 8 }]}>API: {api.baseUrl}</Text>
         </View>
       </SafeAreaView>
     );
@@ -132,7 +146,6 @@ export default function HomeScreen() {
         <View style={styles.center}>
           <Text style={styles.title}>Er ging iets mis</Text>
           <Text style={styles.muted}>{error}</Text>
-          <Text style={[styles.muted, { marginTop: 8 }]}>API: {api.baseUrl}</Text>
           <TouchableOpacity style={styles.button} onPress={load}>
             <Text style={styles.buttonLabel}>Opnieuw proberen</Text>
           </TouchableOpacity>
@@ -161,37 +174,54 @@ export default function HomeScreen() {
         contentContainerStyle={styles.listContent}
         data={items}
         keyExtractor={(it) => it._id}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
-            onPress={() =>
-              router.push({
-                pathname: '/(tabs)/(home)/details',
-                params: { eventId: item._id, userId: userId ?? '' },
-              })
-            }
-          >
-            <View style={styles.row}>
-              <Image
-                source={{ uri: item.imageUrl ?? 'https://via.placeholder.com/160x160?text=Event' }}
-                style={styles.thumb}
-              />
-              <View style={styles.meta}>
-                <Text style={styles.cardTitle} numberOfLines={2}>
-                  {item.title}
-                </Text>
-                {!!(item.date || item.startDate) && (
-                  <Text style={styles.cardMeta}>
-                    {new Date(item.date ?? item.startDate!).toLocaleString('nl-BE')}
-                  </Text>
-                )}
-                <Text style={styles.cardCounts}>
-                  ❤️ {item.likeCount ?? 0}   •   ✅ {item.goingCount ?? 0}
-                </Text>
-              </View>
+        renderItem={({ item }) => {
+          const liked = !!item.__liked;
+          const going = !!item.__going;
+          return (
+            <View style={styles.card}>
+              <Pressable
+                onPress={() =>
+                  router.push({ pathname: '/(tabs)/(home)/details', params: { eventId: item._id, userId: userId ?? '' } })
+                }
+              >
+                <View style={styles.row}>
+                  <Image source={{ uri: item.imageUrl ?? 'https://via.placeholder.com/160x160?text=Event' }} style={styles.thumb} />
+                  <View style={styles.meta}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                    {!!(item.date || item.startDate) && (
+                      <Text style={styles.cardMeta}>{new Date(item.date ?? item.startDate!).toLocaleString('nl-BE')}</Text>
+                    )}
+                    <Text style={styles.cardCounts}>❤️ {item.likeCount ?? 0}   •   ✅ {item.goingCount ?? 0}</Text>
+                  </View>
+                </View>
+              </Pressable>
+
+              {userId ? (
+                <EventActions
+                  eventId={item._id}
+                  userId={userId}
+                  liked={liked}
+                  going={going}
+                  likeCount={item.likeCount ?? 0}
+                  goingCount={item.goingCount ?? 0}
+                  onChanged={(next) => {
+                    setItems(curr => curr.map(ev =>
+                      ev._id === item._id
+                        ? {
+                            ...ev,
+                            __liked: next.liked,
+                            __going: next.going,
+                            likeCount: next.likeCount,
+                            goingCount: next.goingCount,
+                          }
+                        : ev
+                    ));
+                  }}
+                />
+              ) : null}
             </View>
-          </Pressable>
-        )}
+          );
+        }}
       />
     </SafeAreaView>
   );
@@ -219,12 +249,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '700' },
   cardMeta: { marginTop: 4, color: '#666' },
   cardCounts: { marginTop: 6, fontWeight: '600' },
-  button: {
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#111827',
-    borderRadius: 10,
-  },
+  button: { marginTop: 16, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#111827', borderRadius: 10 },
   buttonLabel: { color: '#fff', fontWeight: '700' },
 });

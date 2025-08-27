@@ -17,29 +17,20 @@ const BASE = defaultBaseUrl();
 function withTimeout(ms: number, parentSignal?: AbortSignal) {
   const ctrl = new AbortController();
   const id = setTimeout(() => ctrl.abort(), ms);
-
-  if (parentSignal) {
-    const onAbort = () => ctrl.abort();
-    parentSignal.addEventListener('abort', onAbort, { once: true });
-  }
-
-  return {
-    signal: ctrl.signal,
-    cancel: () => clearTimeout(id),
-  };
+  if (parentSignal) parentSignal.addEventListener('abort', () => ctrl.abort(), { once: true });
+  return { signal: ctrl.signal, cancel: () => clearTimeout(id) };
 }
 
 async function requestOnce(url: string, init: RequestInit | undefined, timeoutMs: number) {
   const { signal, cancel } = withTimeout(timeoutMs, init?.signal as AbortSignal | undefined);
   try {
-    const res = await fetch(url, { ...init, signal });
+    const res = await fetch(url, { ...init, signal, headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) } });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new Error(`HTTP ${res.status} – ${text || res.statusText}`);
     }
-    // Accept both array and {data:[]} shapes
-    const json = await res.json().catch(() => ({}));
-    return json;
+    const text = await res.text();
+    try { return text ? JSON.parse(text) : {}; } catch { return text; }
   } finally {
     cancel();
   }
@@ -47,24 +38,25 @@ async function requestOnce(url: string, init: RequestInit | undefined, timeoutMs
 
 async function request(path: string, init?: RequestInit, timeoutMs = 25000, retries = 1) {
   const url = `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
-
-  // First try
   try {
     return await requestOnce(url, init, timeoutMs);
   } catch (e) {
     if (retries <= 0) throw e;
-
-    // Exponential backoff: 1s, 2s, ...
-    const backoffMs = 1200 * Math.pow(2, 1 - retries); // 1200ms for 1 retry
-    await new Promise((r) => setTimeout(r, backoffMs));
-
-    // Second (final) try, keep same timeout
+    await new Promise(r => setTimeout(r, 1200)); // simple backoff
     return await requestOnce(url, init, timeoutMs);
   }
 }
 
 export const api = {
   baseUrl: BASE,
-  get: <T = unknown>(path: string, init?: RequestInit, timeoutMs?: number, retries?: number) =>
-    request(path, { ...(init || {}), method: 'GET' }, timeoutMs, retries) as Promise<T>,
+  get:  <T=unknown>(path: string, init?: RequestInit, timeoutMs?: number, retries?: number) =>
+    request(path, { ...(init||{}), method:'GET' }, timeoutMs, retries) as Promise<T>,
+  post: <T=unknown>(path: string, body?: any, timeoutMs?: number, retries?: number) =>
+    request(path, { method:'POST', body: body!=null ? JSON.stringify(body) : undefined }, timeoutMs, retries) as Promise<T>,
+  patch:<T=unknown>(path: string, body?: any, timeoutMs?: number, retries?: number) =>
+    request(path, { method:'PATCH', body: body!=null ? JSON.stringify(body) : undefined }, timeoutMs, retries) as Promise<T>,
+  put:  <T=unknown>(path: string, body?: any, timeoutMs?: number, retries?: number) =>
+    request(path, { method:'PUT', body: body!=null ? JSON.stringify(body) : undefined }, timeoutMs, retries) as Promise<T>,
+  del:  <T=unknown>(path: string, timeoutMs?: number, retries?: number) =>
+    request(path, { method:'DELETE' }, timeoutMs, retries) as Promise<T>,
 };
