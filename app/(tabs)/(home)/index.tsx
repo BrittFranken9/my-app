@@ -14,7 +14,6 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '@/lib/api';
 import EventActions from '@/components/EventActions';
-import { fetchLikedIds, fetchGoingIds } from '@/lib/relations';
 
 type EventItem = {
   _id: string;
@@ -26,9 +25,8 @@ type EventItem = {
   imageUrl?: string;
   likeCount?: number;
   goingCount?: number;
-  // derived flags populated after we call the archive endpoints:
-  __liked?: boolean;
-  __going?: boolean;
+  likedBy?: string[];     // if your API returns these
+  goingBy?: string[];     // if your API returns these
 };
 
 function pickArray(data: any): any[] {
@@ -55,17 +53,10 @@ function normalize(list: any[]): EventItem[] {
       date: it.date ?? it.startDate ?? it.startsAt ?? it.createdAt,
       startDate: it.startDate,
       imageUrl: it.imageUrl ?? it.cover ?? it.banner ?? undefined,
-      likeCount:
-        it.likeCount ??
-        it.likes ??
-        (Array.isArray(it.likedBy) ? it.likedBy.length : undefined) ??
-        0,
-      goingCount:
-        it.goingCount ??
-        it.going ??
-        it.attending ??
-        (Array.isArray(it.goingBy) ? it.goingBy.length : undefined) ??
-        0,
+      likeCount: it.likeCount ?? it.likes ?? (Array.isArray(it.likedBy) ? it.likedBy.length : 0) ?? 0,
+      goingCount: it.goingCount ?? it.going ?? it.attending ?? (Array.isArray(it.goingBy) ? it.goingBy.length : 0) ?? 0,
+      likedBy: it.likedBy,
+      goingBy: it.goingBy,
     };
   }).filter(e => !!e._id);
 }
@@ -96,28 +87,12 @@ export default function HomeScreen() {
     try {
       setLoading(true);
       setError(null);
-
-      // 1) Load events
       const data1 = await api.get<any>('/events', undefined, 25000, 1);
       let list = normalize(pickArray(data1));
       if (!list.length) {
         const data2 = await api.get<any>('/events/list', undefined, 25000, 1);
         list = normalize(pickArray(data2));
       }
-
-      // 2) If we know the user, pull liked + going sets from archive endpoints
-      if (userId) {
-        const [likedSet, goingSet] = await Promise.all([
-          fetchLikedIds(userId),
-          fetchGoingIds(userId),
-        ]);
-        list = list.map(e => ({
-          ...e,
-          __liked: likedSet.has(e._id),
-          __going: goingSet.has(e._id),
-        }));
-      }
-
       setItems(list);
     } catch (err: any) {
       const reason = err?.name === 'AbortError' ? 'De verbinding duurde te lang (timeout).' : String(err?.message || 'Onbekende fout');
@@ -125,7 +100,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -135,6 +110,7 @@ export default function HomeScreen() {
         <View style={styles.center}>
           <ActivityIndicator />
           <Text style={styles.muted}>Even geduld…</Text>
+          <Text style={[styles.muted, { marginTop: 8 }]}>API: {api.baseUrl}</Text>
         </View>
       </SafeAreaView>
     );
@@ -175,8 +151,8 @@ export default function HomeScreen() {
         data={items}
         keyExtractor={(it) => it._id}
         renderItem={({ item }) => {
-          const liked = !!item.__liked;
-          const going = !!item.__going;
+          const liked = !!(userId && Array.isArray(item.likedBy) && item.likedBy.includes(userId));
+          const going = !!(userId && Array.isArray(item.goingBy) && item.goingBy.includes(userId));
           return (
             <View style={styles.card}>
               <Pressable
@@ -205,17 +181,12 @@ export default function HomeScreen() {
                   likeCount={item.likeCount ?? 0}
                   goingCount={item.goingCount ?? 0}
                   onChanged={(next) => {
-                    setItems(curr => curr.map(ev =>
-                      ev._id === item._id
-                        ? {
-                            ...ev,
-                            __liked: next.liked,
-                            __going: next.going,
-                            likeCount: next.likeCount,
-                            goingCount: next.goingCount,
-                          }
-                        : ev
-                    ));
+                    setItems(curr => curr.map(ev => ev._id === item._id
+                      ? { ...ev, likeCount: next.likeCount, goingCount: next.goingCount,
+                          likedBy: updateSet(ev.likedBy, userId, next.liked),
+                          goingBy: updateSet(ev.goingBy, userId, next.going),
+                        }
+                      : ev));
                   }}
                 />
               ) : null}
@@ -225,6 +196,12 @@ export default function HomeScreen() {
       />
     </SafeAreaView>
   );
+}
+
+function updateSet(arr: string[]|undefined, id: string, include: boolean) {
+  const set = new Set(arr ?? []);
+  if (include) set.add(id); else set.delete(id);
+  return Array.from(set);
 }
 
 const styles = StyleSheet.create({

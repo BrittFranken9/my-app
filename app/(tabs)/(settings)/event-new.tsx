@@ -30,53 +30,35 @@ export default function EventNew() {
   }, []);
 
   const save = async () => {
-    // Basic required-field validation
-    if (!title.trim()) {
-      Alert.alert('Titel vereist', 'Vul een titel in.');
-      return;
-    }
-    if (!date.trim()) {
-      Alert.alert('Datum vereist', 'Vul een datum/tijd in (bijv. 2025-08-27T20:00).');
-      return;
-    }
-    if (!location.trim()) {
-      Alert.alert('Locatie vereist', 'Vul een locatie in.');
-      return;
-    }
-    if (!organizer.trim()) {
-      Alert.alert('Organisatie vereist', 'Vul een organisatienaam in.');
-      return;
-    }
+  try {
+    // Alles optioneel, stuur gewoon door wat er is
+    const body = {
+      title,
+      description,
+      date,       // optioneel, ISO string
+      location,
+      organizer,
+      imageUrl,
+      ownerId: userId,
+    };
 
-    setSaving(true);
-    try {
-      // Body matches your backend requirements (date, location, organization are REQUIRED)
-      const body = {
-        title,
-        description,
-        date,          // e.g. "2025-08-27T20:00" or ISO string
-        location,      // REQUIRED
-        organizer,     // REQUIRED
-        imageUrl,
-        ownerId: userId,
-      };
+    await api.post('/events', body);
+    Alert.alert('Event toegevoegd', 'Je event is aangemaakt.');
+    router.replace('/my-events');
+  } catch (e: any) {
+    Alert.alert('Fout', e?.message || 'Kon event niet opslaan.');
+  } finally {
+    setSaving(false);
+  }
+};
 
-      await api.post('/events', body);
-      Alert.alert('Event toegevoegd', 'Je event is aangemaakt.');
-      router.replace('/my-events'); // left as in your snippet
-    } catch (e: any) {
-      Alert.alert('Fout', e?.message || 'Kon event niet opslaan.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.box}>
         <Text style={styles.h1}>Nieuw event</Text>
 
-        <Text style={styles.label}>Titel *</Text>
+        <Text style={styles.label}>Titel</Text>
         <TextInput
           style={styles.input}
           value={title}
@@ -85,7 +67,7 @@ export default function EventNew() {
           autoCapitalize="sentences"
         />
 
-        <Text style={styles.label}>Datum/tijd (ISO) *</Text>
+        <Text style={styles.label}>Datum/tijd</Text>
         <TextInput
           style={styles.input}
           value={date}
@@ -94,7 +76,7 @@ export default function EventNew() {
           autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Locatie *</Text>
+        <Text style={styles.label}>Locatie</Text>
         <TextInput
           style={styles.input}
           value={location}
@@ -102,7 +84,7 @@ export default function EventNew() {
           placeholder="Bijv. Antwerpen, België"
         />
 
-        <Text style={styles.label}>Organisatie *</Text>
+        <Text style={styles.label}>Organisatie</Text>
         <TextInput
           style={styles.input}
           value={organizer}
@@ -129,9 +111,9 @@ export default function EventNew() {
           multiline
         />
 
-        <TouchableOpacity style={styles.btn} onPress={save} disabled={saving || !title.trim()}>
-          <Text style={styles.btnLabel}>{saving ? 'Bezig…' : 'Opslaan'}</Text>
-        </TouchableOpacity>
+        <TouchableOpacity style={styles.btn} onPress={save} disabled={saving}>
+  <Text style={styles.btnLabel}>{saving ? 'Bezig…' : 'Opslaan'}</Text>
+</TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

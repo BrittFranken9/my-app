@@ -84,7 +84,7 @@ export default function DetailsScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={styles.title}>Er ging iets mis</Text>
+          <Text style={styles.h1}>Er ging iets mis</Text>
           <Text style={styles.muted}>{error ?? 'Event niet gevonden'}</Text>
         </View>
       </SafeAreaView>
@@ -135,13 +135,12 @@ function updateSet(arr: string[]|undefined, id: string, include: boolean) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: '#0f172a' },
   content: { paddingBottom: 32 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  hero: { width: '100%', height: 220, backgroundColor: '#eee' },
-  h1: { fontSize: 22, fontWeight: '800', paddingHorizontal: 16, marginTop: 12 },
-  meta: { paddingHorizontal: 16, marginTop: 4, color: '#6b7280' },
-  body: { paddingHorizontal: 16, marginTop: 12, fontSize: 16, lineHeight: 22, color: '#111827' },
-  muted: { marginTop: 6, color: '#666' },
-  title: { fontSize: 18, fontWeight: '700' },
+  hero: { width: '100%', height: 260, backgroundColor: '#1f2937' },
+  h1: { fontSize: 26, fontWeight: '900', paddingHorizontal: 16, marginTop: 12, color: '#f9fafb' },
+  meta: { paddingHorizontal: 16, marginTop: 6, color: '#cbd5e1' },
+  body: { paddingHorizontal: 16, marginTop: 14, fontSize: 16, lineHeight: 22, color: '#e5e7eb' },
+  muted: { color: '#9ca3af' },
 });

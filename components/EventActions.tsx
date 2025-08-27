@@ -111,9 +111,19 @@ export default function EventActions({
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  btn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#111827' },
+  wrap: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  btn: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: '#111827',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 4,
+  },
   btnActive: { backgroundColor: '#065f46' },
-  btnLabel: { color: '#fff', fontWeight: '700' },
+  btnLabel: { color: '#fff', fontWeight: '800', letterSpacing: 0.2 },
   btnLabelActive: { color: '#fff' },
 });
