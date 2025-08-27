@@ -9,9 +9,9 @@ export default function EventNew() {
   const [userId, setUserId] = useState<string>('');
 
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState(''); // ISO string or yyyy-mm-ddThh:mm
-  const [location, setLocation] = useState(''); // REQUIRED by backend
-  const [organizer, setOrganizer] = useState(''); // REQUIRED by backend
+  const [date, setDate] = useState(''); // ISO string or yyyy-mm-ddThh:mm (optional)
+  const [location, setLocation] = useState(''); // optional
+  const [organizer, setOrganizer] = useState(''); // optional
   const [imageUrl, setImageUrl] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
@@ -30,28 +30,28 @@ export default function EventNew() {
   }, []);
 
   const save = async () => {
-  try {
-    // Alles optioneel, stuur gewoon door wat er is
-    const body = {
-      title,
-      description,
-      date,       // optioneel, ISO string
-      location,
-      organizer,
-      imageUrl,
-      ownerId: userId,
-    };
+    setSaving(true);
+    try {
+      // Everything is optional now
+      const body = {
+        title,
+        description,
+        date,          // optioneel, ISO string
+        location,
+        organizerName: organizer,
+        imageUrl,
+        ownerId: userId,
+      };
 
-    await api.post('/events', body);
-    Alert.alert('Event toegevoegd', 'Je event is aangemaakt.');
-    router.replace('/my-events');
-  } catch (e: any) {
-    Alert.alert('Fout', e?.message || 'Kon event niet opslaan.');
-  } finally {
-    setSaving(false);
-  }
-};
-
+      await api.post('/events', body);
+      Alert.alert('Event toegevoegd', 'Je event is aangemaakt.');
+      router.replace('/my-events');
+    } catch (e: any) {
+      Alert.alert('Fout', e?.message || 'Kon event niet opslaan.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -59,15 +59,9 @@ export default function EventNew() {
         <Text style={styles.h1}>Nieuw event</Text>
 
         <Text style={styles.label}>Titel</Text>
-        <TextInput
-          style={styles.input}
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Titel"
-          autoCapitalize="sentences"
-        />
+        <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Titel…" />
 
-        <Text style={styles.label}>Datum/tijd</Text>
+        <Text style={styles.label}>Datum</Text>
         <TextInput
           style={styles.input}
           value={date}
@@ -89,8 +83,7 @@ export default function EventNew() {
           style={styles.input}
           value={organizer}
           onChangeText={setOrganizer}
-          placeholder="Naam van de organisatie"
-          autoCapitalize="words"
+          placeholder="Organisator/Organisatie"
         />
 
         <Text style={styles.label}>Afbeelding URL</Text>
@@ -112,8 +105,8 @@ export default function EventNew() {
         />
 
         <TouchableOpacity style={styles.btn} onPress={save} disabled={saving}>
-  <Text style={styles.btnLabel}>{saving ? 'Bezig…' : 'Opslaan'}</Text>
-</TouchableOpacity>
+          <Text style={styles.btnLabel}>{saving ? 'Bezig…' : 'Opslaan'}</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

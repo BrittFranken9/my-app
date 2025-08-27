@@ -1,84 +1,98 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { api } from '@/lib/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function EventEdit() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [userId, setUserId] = useState<string>('');
+  const router = useRouter();
+
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState<string>('');
+  const [location, setLocation] = useState('');
+  const [organizerName, setOrganizerName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [description, setDescription] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const raw = await AsyncStorage.getItem('userId');
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          setUserId(parsed?.id ?? parsed?._id ?? String(parsed) ?? '');
-        } catch {
-          setUserId(raw);
-        }
-      }
-      if (!id) return setLoading(false);
-      try {
-        const data = await api.get<any>(`/events/${id}`);
-        const e = Array.isArray(data) ? data[0] : data?.data ?? data;
-        setTitle(e?.title ?? e?.name ?? '');
-        setDate(e?.date ?? e?.startDate ?? '');
-        setImageUrl(e?.imageUrl ?? e?.cover ?? e?.banner ?? '');
-        setDescription(e?.description ?? e?.details ?? '');
-      } catch (e) {
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const load = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const e: any = await api.get(`/events/${id}`, undefined, 20000, 1);
+      setTitle(e.title ?? e.name ?? e.teaser ?? '');
+      setDate(e.date ?? e.startDate ?? '');
+      setLocation(e.location ?? '');
+      setOrganizerName(e.organizerName ?? e.organizationName ?? '');
+      setImageUrl(e.imageUrl ?? e.cover ?? '');
+      setDescription(e.teaser ?? e.description ?? '');
+    } catch (e: any) {
+      Alert.alert('Fout', e?.message || 'Kon event niet laden.');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
+  useEffect(() => { load(); }, [load]);
+
   const save = async () => {
+    if (!id) return;
+    setSaving(true);
     try {
-      setSaving(true);
-      const body = { title, description, date, imageUrl, ownerId: userId };
-      await api.put(`/events/${id}`, body); // adjust to PATCH if your API uses PATCH
-      Alert.alert('Opgeslagen', 'Event is bijgewerkt.');
-      router.replace('/my-events');
-    } catch (e:any) {
-      Alert.alert('Fout', e?.message || 'Kon event niet opslaan.');
+      const body = {
+        title,
+        date,
+        location,
+        organizerName,
+        imageUrl,
+        teaser: description,
+      };
+      await api.patch(`/events/${id}`, body);
+      Alert.alert('Opgeslagen', 'Wijzigingen zijn bewaard.');
+      router.back();
+    } catch (e: any) {
+      Alert.alert('Fout', e?.message || 'Kon niet opslaan.');
     } finally {
       setSaving(false);
     }
   };
 
+  if (loading) {
+    return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.box}><Text style={styles.h1}>Laden…</Text></ScrollView></SafeAreaView>;
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.box}>
-        <Text style={styles.h1}>Event bewerken</Text>
+        <Text style={styles.h1}>Event wijzigen</Text>
 
         <Text style={styles.label}>Titel</Text>
-        <TextInput style={styles.input} value={title} onChangeText={setTitle} editable={!loading} />
+        <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Titel…" />
 
-        <Text style={styles.label}>Datum/tijd</Text>
-        <TextInput style={styles.input} value={date} onChangeText={setDate} editable={!loading} placeholder="2025-08-27T20:00" />
+        <Text style={styles.label}>Datum</Text>
+        <TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="2025-09-01T20:00" />
+
+        <Text style={styles.label}>Locatie</Text>
+        <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="Locatie…" />
+
+        <Text style={styles.label}>Organisatie</Text>
+        <TextInput style={styles.input} value={organizerName} onChangeText={setOrganizerName} placeholder="Organisatie…" />
 
         <Text style={styles.label}>Afbeelding URL</Text>
-        <TextInput style={styles.input} value={imageUrl} onChangeText={setImageUrl} editable={!loading} placeholder="https://..." />
+        <TextInput style={styles.input} value={imageUrl} onChangeText={setImageUrl} placeholder="https://..." autoCapitalize="none" />
 
         <Text style={styles.label}>Beschrijving</Text>
         <TextInput
           style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
           value={description}
           onChangeText={setDescription}
-          editable={!loading}
+          placeholder="Details…"
           multiline
         />
 
-        <TouchableOpacity style={styles.btn} onPress={save} disabled={saving || loading || !title.trim()}>
+        <TouchableOpacity style={styles.btn} onPress={save} disabled={saving}>
           <Text style={styles.btnLabel}>{saving ? 'Bezig…' : 'Opslaan'}</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -91,7 +105,20 @@ const styles = StyleSheet.create({
   box: { padding: 16 },
   h1: { fontSize: 22, fontWeight: '800', marginBottom: 12 },
   label: { fontWeight: '700', marginTop: 10 },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginTop: 6 },
-  btn: { marginTop: 16, backgroundColor: '#111827', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  btn: {
+    marginTop: 16,
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
   btnLabel: { color: '#fff', fontWeight: '700' },
 });
