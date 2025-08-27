@@ -43,6 +43,7 @@ const styles = StyleSheet.create({
   btn: { marginTop: 10, backgroundColor: '#111827', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 16 },
   btnLabel: { color: '#fff', fontWeight: '700' },
     logoutButton: {
+    marginTop: 80,
     backgroundColor: "#7C3AED",
     paddingVertical: 14,
     borderRadius: 12,

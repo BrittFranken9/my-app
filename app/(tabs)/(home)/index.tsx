@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 6,
   },
-  mediaWrap: { position: 'relative' },
+  mediaWrap: { position: 'relative', marginTop: 40 },
   cardImage: { width: '100%', height: 200 },
   cardImagePlaceholder: { backgroundColor: '#374151' },
   badgesRow: { position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', gap: 8 },
