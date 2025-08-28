@@ -22,7 +22,7 @@ export default function SettingsHome() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.box}>
         <Text style={styles.h1}>Settings</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => router.push('/profile')}>
+        <TouchableOpacity style={styles.btn} onPress={() => router.push('/settings')}>
           <Text style={styles.btnLabel}>Profielnaam aanpassen</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.btn} onPress={() => router.push('/my-events')}>
